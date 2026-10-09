@@ -1060,3 +1060,9 @@ class DynamicPipelineTester(unittest.TestCase):
         self.assertListEqual(
             nested_simplify([{"label": results["label"], "score": results["score"]}]), nested_simplify(new_results)
         )
+
+
+class PipelineInitTest(unittest.TestCase):
+    def test_pipeline_code_revision_conflict(self):
+        with self.assertRaisesRegex(ValueError, r"You cannot use both `pipeline\(\.\.\. code_revision=\.\.\., model_kwargs=\{\"code_revision\":\.\.\.\}\)`"):
+            pipeline('text-generation', model='HuggingFaceM4/tiny-random-LlamaForCausalLM', code_revision='main', model_kwargs={'code_revision': 'main'})
