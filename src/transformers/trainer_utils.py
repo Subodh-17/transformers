@@ -304,11 +304,14 @@ def sort_checkpoints(
     """
     # Ensure regex matches exactly to the end of the folder name to avoid picking up backups or derivatives.
     strict_re = re.compile(rf"^{re.escape(checkpoint_prefix)}-([0-9]+)$")
-    glob_checkpoints = [
-        str(x)
-        for x in Path(output_dir).iterdir()
-        if x.is_dir() and strict_re.match(x.name)
-    ] if Path(output_dir).exists() else []
+    try:
+        glob_checkpoints = [
+            str(x)
+            for x in Path(output_dir).iterdir()
+            if x.is_dir() and strict_re.match(x.name)
+        ]
+    except OSError:
+        glob_checkpoints = []
 
     ordering_and_checkpoint_path = []
     for path in glob_checkpoints:

@@ -813,7 +813,7 @@ class TrainerCheckpointRotationTest(TestCasePlus, TrainerIntegrationCommon):
             os.makedirs(os.path.join(tmp_dir, f"{prefix}-30.backup"))
 
             sorted_cps_custom = sort_checkpoints(tmp_dir, checkpoint_prefix=prefix)
-            values_custom = [int(re.match(rf".*{re.escape(prefix)}-([0-9]+)", d).groups()[0]) for d in sorted_cps_custom]
+            values_custom = [int(re.match(rf"^{re.escape(prefix)}-([0-9]+)$", os.path.basename(d)).groups()[0]) for d in sorted_cps_custom]
             self.assertEqual(values_custom, [5, 10, 15, 20, 25])
 
             # Test with best_model_checkpoint - moved to second-to-last to protect from deletion
@@ -848,9 +848,9 @@ class TrainerCheckpointRotationTest(TestCasePlus, TrainerIntegrationCommon):
         # Check legitimate checkpoints match expected
         glob_checkpoints = [
             str(x) for x in Path(output_dir).iterdir()
-            if x.is_dir() and re.match(rf"^{PREFIX_CHECKPOINT_DIR}-([0-9]+)$", x.name)
+            if x.is_dir() and re.match(rf"^{re.escape(PREFIX_CHECKPOINT_DIR)}-([0-9]+)$", x.name)
         ]
-        values = [int(re.match(rf"^{PREFIX_CHECKPOINT_DIR}-([0-9]+)$", os.path.basename(d)).groups()[0]) for d in glob_checkpoints]
+        values = [int(re.match(rf"^{re.escape(PREFIX_CHECKPOINT_DIR)}-([0-9]+)$", os.path.basename(d)).groups()[0]) for d in glob_checkpoints]
         self.assertSetEqual(set(values), set(expected))
 
     def test_checkpoint_rotation(self):
