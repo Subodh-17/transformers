@@ -793,10 +793,28 @@ class TrainerCheckpointRotationTest(TestCasePlus, TrainerIntegrationCommon):
             for n in [20, 5, 15, 25, 10]:
                 os.makedirs(os.path.join(tmp_dir, f"{PREFIX_CHECKPOINT_DIR}-{n}"))
 
-            # Test sorting by step number (oldest first)
+            # Create an invalid backup directory that matches the prefix
+            os.makedirs(os.path.join(tmp_dir, f"{PREFIX_CHECKPOINT_DIR}-30.backup"))
+
+            # Test sorting by step number (oldest first) ignores the backup
             sorted_cps = sort_checkpoints(tmp_dir)
             values = [int(re.match(f".*{PREFIX_CHECKPOINT_DIR}-([0-9]+)", d).groups()[0]) for d in sorted_cps]
             self.assertEqual(values, [5, 10, 15, 20, 25])
+
+            # Test sorting by modification time ignores the backup
+            sorted_cps_mtime = sort_checkpoints(tmp_dir, use_mtime=True)
+            values_mtime = [int(re.match(f".*{PREFIX_CHECKPOINT_DIR}-([0-9]+)", d).groups()[0]) for d in sorted_cps_mtime]
+            self.assertEqual(values_mtime, [5, 10, 15, 20, 25])
+
+            # Test custom prefix with regex and glob metacharacters
+            prefix = "check[0-9]+point"
+            for n in [20, 5, 15, 25, 10]:
+                os.makedirs(os.path.join(tmp_dir, f"{prefix}-{n}"))
+            os.makedirs(os.path.join(tmp_dir, f"{prefix}-30.backup"))
+
+            sorted_cps_custom = sort_checkpoints(tmp_dir, checkpoint_prefix=prefix)
+            values_custom = [int(re.match(rf".*{re.escape(prefix)}-([0-9]+)", d).groups()[0]) for d in sorted_cps_custom]
+            self.assertEqual(values_custom, [5, 10, 15, 20, 25])
 
             # Test with best_model_checkpoint - moved to second-to-last to protect from deletion
             best = os.path.join(tmp_dir, f"{PREFIX_CHECKPOINT_DIR}-5")
@@ -814,13 +832,25 @@ class TrainerCheckpointRotationTest(TestCasePlus, TrainerIntegrationCommon):
         # Make fake checkpoints
         for n in [5, 10, 15, 20, 25]:
             os.makedirs(os.path.join(output_dir, f"{PREFIX_CHECKPOINT_DIR}-{n}"), exist_ok=True)
+        # Add an invalid backup directory
+        backup_path = os.path.join(output_dir, f"{PREFIX_CHECKPOINT_DIR}-30.backup")
+        os.makedirs(backup_path, exist_ok=True)
+
         rotate_checkpoints(
             output_dir=output_dir,
             save_total_limit=trainer.args.save_total_limit,
             best_model_checkpoint=trainer.state.best_model_checkpoint,
         )
-        glob_checkpoints = [str(x) for x in Path(output_dir).glob(f"{PREFIX_CHECKPOINT_DIR}-*")]
-        values = [int(re.match(f".*{PREFIX_CHECKPOINT_DIR}-([0-9]+)", d).groups()[0]) for d in glob_checkpoints]
+
+        # Check backup survived rotation
+        self.assertTrue(os.path.exists(backup_path))
+
+        # Check legitimate checkpoints match expected
+        glob_checkpoints = [
+            str(x) for x in Path(output_dir).iterdir()
+            if x.is_dir() and re.match(rf"^{PREFIX_CHECKPOINT_DIR}-([0-9]+)$", x.name)
+        ]
+        values = [int(re.match(rf"^{PREFIX_CHECKPOINT_DIR}-([0-9]+)$", os.path.basename(d)).groups()[0]) for d in glob_checkpoints]
         self.assertSetEqual(set(values), set(expected))
 
     def test_checkpoint_rotation(self):

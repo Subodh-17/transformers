@@ -302,14 +302,20 @@ def sort_checkpoints(
     Returns:
         `list[str]`: Sorted list of checkpoint directory paths (oldest first).
     """
-    glob_checkpoints = [str(x) for x in Path(output_dir).glob(f"{checkpoint_prefix}-*") if os.path.isdir(x)]
+    # Ensure regex matches exactly to the end of the folder name to avoid picking up backups or derivatives.
+    strict_re = re.compile(rf"^{re.escape(checkpoint_prefix)}-([0-9]+)$")
+    glob_checkpoints = [
+        str(x)
+        for x in Path(output_dir).iterdir()
+        if x.is_dir() and strict_re.match(x.name)
+    ] if Path(output_dir).exists() else []
 
     ordering_and_checkpoint_path = []
     for path in glob_checkpoints:
         if use_mtime:
             ordering_and_checkpoint_path.append((os.path.getmtime(path), path))
         else:
-            regex_match = re.match(f".*{checkpoint_prefix}-([0-9]+)", path)
+            regex_match = strict_re.match(os.path.basename(path))
             if regex_match is not None and regex_match.groups() is not None:
                 ordering_and_checkpoint_path.append((int(regex_match.groups()[0]), path))
 
