@@ -310,7 +310,7 @@ def sort_checkpoints(
             for x in Path(output_dir).iterdir()
             if x.is_dir() and strict_re.match(x.name)
         ]
-    except OSError:
+    except (FileNotFoundError, NotADirectoryError):
         glob_checkpoints = []
 
     ordering_and_checkpoint_path = []
